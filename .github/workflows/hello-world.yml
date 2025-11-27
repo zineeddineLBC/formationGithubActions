@@ -1,36 +1,27 @@
 
-name: Hello World Matrix Pipeline
+name: Hello World Single OS Pipeline
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   workflow_dispatch:
-    inputs:
-      run_second_job:
-        description: "Activate the second job that asks 'How are you?'"
-        required: true
-        default: "false"
-        type: choice
-        options:
-          - "false"
-          - "true"
 
 jobs:
   hello-world:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ubuntu-latest
     steps:
       - name: Print Hello World
-        run: echo "Hello World from ${{ matrix.os }}"
+        run: echo "Hello World from ubuntu-latest"
 
-  ask-how-are-you:
-    if: ${{ github.event.inputs.run_second_job == 'true' }}
-    runs-on: ${{ matrix.os }}
+  ask-questions:
+    needs: hello-world
+    runs-on: ubuntu-latest
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        question:
+          - "How are you feeling today?"
+          - "What's your current status?"
+          - "Anything exciting happening?"
     steps:
-      - name: Ask how are you
-        run: echo "How are you from ${{ matrix.os }}?"
+      - name: Ask a question
+        run: echo "${{ matrix.question }} (from ubuntu-latest)"

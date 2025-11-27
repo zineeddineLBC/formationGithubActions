@@ -8,7 +8,7 @@ env:
   NODE_VERSION: '20.x'
 
 jobs:
-  build:cd
+  build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
