@@ -1,8 +1,13 @@
 
-name: Correction pipeline to correct
-
+name: Pipeline to correct
 
 on:
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - "**/*.py"
+      - "requirements*.txt"
+      - ".github/workflows/**"
   workflow_dispatch:    
 
 permissions:
@@ -38,8 +43,11 @@ jobs:
         run: mypy .
 
   test:
-    name: Unit Tests (Python 3.11 only)
+    name: Unit Tests
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [ "3.10", "3.11", "3.12" ]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -47,7 +55,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: ${{ matrix.python-version }}
           cache: "pip"
           cache-dependency-path: requirements.txt
 
@@ -57,18 +65,8 @@ jobs:
           pip install -r requirements.txt
           pip install pytest pytest-cov
 
-
-      - name: Run tests (pass if no tests are found)
-        run: |
-          set -e
-          pytest --maxfail=1 --disable-warnings --exitfirst --strict-markers -q || rc=$?
-          if [ "${rc:-0}" -eq 5 ]; then
-            echo "ℹ️ No tests were collected. Continuing without failing."
-            exit 0
-          else
-            exit "${rc:-0}"
-          fi
-
+      - name: Run tests
+        run: pytest --maxfail=1 --disable-warnings -q
 
   upload-logs:
     name: Upload Logs
@@ -82,11 +80,9 @@ jobs:
           echo "Commit: $GITHUB_SHA" >> pipeline_logs.txt
           echo "Branch: $GITHUB_REF" >> pipeline_logs.txt
           echo "--- Lint & Test Summary ---" >> pipeline_logs.txt
-          echo "Lint completed successfully." >> pipeline_logs.txt
-          echo "Tests executed (errors ignored)." >> pipeline_logs.txt
+          echo "Lint and tests completed successfully." >> pipeline_logs.txt
 
       - name: Upload log file
         uses: actions/upload-artifact@v4
         with:
           name: pipeline-logs
-          path: pipeline_logs.txt

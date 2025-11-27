@@ -2,9 +2,8 @@
 name: Hello World Single OS Pipeline
 
 on:
-  push:
-    branches: ["main"]
   workflow_dispatch:
+
 
 jobs:
   hello-world:
