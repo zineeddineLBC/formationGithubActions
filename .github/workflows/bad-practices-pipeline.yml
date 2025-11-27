@@ -1,0 +1,224 @@
+
+name: Extremely Bad and Bloated Pipeline That Does Way Too Much For Nothing
+
+# Triggered on everything, with no filters, including pull requests from forks (dangerous).
+on:
+  push:
+    branches:
+      - '*'
+    tags:
+      - '*'
+    paths:
+      - '**/*'
+  pull_request:
+    branches:
+      - '*'
+    paths:
+      - '**/*'
+  workflow_dispatch:
+    inputs:
+      run_anything:
+        description: "Type literally anything (ignored)"
+        required: false
+        default: "yolo"
+
+# Maximal permissions without reason (bad: over-privileged)
+permissions:
+  contents: write
+  actions: write
+  checks: write
+  deployments: write
+  issues: write
+  packages: write
+  pull-requests: write
+  repository-projects: write
+  security-events: write
+
+env:
+  # Hardcoded secrets in plaintext (extremely bad!)
+  DB_PASSWORD: "SuperSecretButActuallyLoggedLater"
+  API_KEY: "abc123-plaintext-in-repo"
+  DEPLOY_HOST: "prod.example.com"
+  DEPLOY_USER: "root" # bad practice: root deploy
+  # Random envs not used
+  UNUSED_1: "not_used_at_all"
+  UNUSED_2: "also_not_used"
+
+jobs:
+  job_initialization_that_does_not_really_initialize_anything:
+    name: Init (But Actually Does Nothing)
+    runs-on: ubuntu-latest
+    timeout-minutes: 999 # way too high
+    continue-on-error: true # hides problems
+    steps:
+      # Redundant checkout repeated later anyway
+      - name: Checkout (unnecessary)
+        uses: actions/checkout@v4
+
+      # Print the world and excessively verbose logging
+      - name: Dump every environment variable (logs secrets; BAD)
+        run: |
+          echo "=== ENV START ==="
+          env | sort
+          echo "DB_PASSWORD: $DB_PASSWORD"
+          echo "API_KEY: $API_KEY"
+          echo "=== ENV END ==="
+
+      # Sleep steps that waste runner time
+      - name: Sleep for no reason
+        run: |
+          echo "Sleeping arbitrarily..."
+          sleep 7
+          echo "Woke up, still doing nothing."
+
+      # Install random tools without pinning; no cache
+      - name: Install a bunch of stuff we don’t need
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cowsay figlet tree jq curl wget python3 python3-pip
+          pip3 install --user requests boto3 numpy pandas # no versions pinned
+          cowsay "This adds zero value."
+
+      # Use deprecated set-output syntax (removed in modern Actions)
+      - name: Set deprecated outputs (no consumer)
+        run: |
+          echo "::set-output name=deprecated::true"
+
+      # Create and log files that contain "secrets"
+      - name: Write secrets to file and display them (worst practice)
+        run: |
+          echo "password=$DB_PASSWORD" > secret.txt
+          cat secret.txt
+
+      # Randomly create artifacts we’ll never use
+      - name: Create pointless artifacts
+        run: |
+          echo "I am an artifact with nonsense content" > artifact.txt
+          figlet "Artifact!"
+      - name: Upload entire working directory as artifact (huge)
+        uses: actions/upload-artifact@v4
+        with:
+          name: entire-workspace
+          path: .
+          retention-days: 90 # excessive
+
+  pointless_lint_that_is_not_configured:
+    name: Lint (But wrong and noisy)
+    runs-on: ubuntu-latest
+    needs:
+      - job_initialization_that_does_not_really_initialize_anything
+    steps:
+      # Repeated checkout (again)
+      - name: Checkout again, why not
+        uses: actions/checkout@v4
+
+      # Install linters without pinning versions
+      - name: Install flake8 without pinning; ignore errors
+        run: |
+          python3 -m pip install flake8
+          sleep 3
+          echo "Running flake8 against random directories"
+          flake8 || echo "Ignoring failures because why not"
+
+      # Excessive logging, random directories
+      - name: List EVERYTHING endlessly
+        run: |
+          echo "Listing cwd"
+          pwd
+          echo "Listing files"
+          ls -la
+          echo "Recursive list"
+          tree -a -L 3 || true
+
+  tests_but_not_really:
+    name: Tests (But unreliable and ignored)
+    runs-on: ubuntu-latest
+    needs:
+      - pointless_lint_that_is_not_configured
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: [ "3.9", "3.10", "3.11", "3.12" ]
+        os: [ ubuntu-latest ]
+        random: [ "x", "y", "z" ]  # Adds pointless matrix expansion
+    steps:
+      - name: Checkout (yes, again)
+        uses: actions/checkout@v4
+
+      - name: Setup Python (unpinned dependencies)
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies without cache or lockfile
+        run: |
+          pip install -U pip
+          pip install pytest coverage requests  # no versions pinned
+
+      - name: Run flaky tests and ignore failures while being verbose
+        continue-on-error: true
+        run: |
+          echo "Starting tests on Python ${{ matrix.python-version }}"
+          pytest -vv || echo "Tests failed, but we ignore it!"
+          coverage run -m pytest || echo "Coverage failed too!"
+          coverage report -m || true
+          sleep 5
+          echo "Done pretending to test."
+
+      - name: Upload coverage (even if empty)
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.python-version }}
+          path: .
+          retention-days: 60
+
+  build_for_no_reason:
+    name: Build (But not reproducible)
+    runs-on: ubuntu-latest
+    needs:
+      - tests_but_not_really
+    steps:
+      - name: Checkout yet again
+        uses: actions/checkout@v4
+
+      - name: Random build steps that do not build anything meaningful
+        run: |
+          echo "Building something… maybe."
+          echo "Version: $RANDOM" > version.txt
+          python3 -c "print('Fake build step')"
+          sleep 2
+          echo "Done."
+
+      - name: Upload build outputs that are junk
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-junk
+          path: |
+            version.txt
+            .
+          retention-days: 120
+
+  deploy_directly_to_prod_no_approvals:
+    name: Deploy (Direct to prod, unsafe)
+    runs-on: ubuntu-latest
+    needs:
+      - build_for_no_reason
+    steps:
+      - name: Checkout (again and again)
+        uses: actions/checkout@v4
+
+      - name: Print secrets again for good measure
+        run: |
+          echo "Deploying with password: $DB_PASSWORD"
+          echo "API key: $API_KEY"
+
+      - name: Deploy as root over SSH with no host key checking (BAD)
+        env:
+          SSHPASS: ${{ env.DB_PASSWORD }}  # mixing secrets and envs horribly
+        run: |
+          echo "Pretending to deploy to $DEPLOY_HOST as $DEPLOY_USER"
+          echo "Skipping SSH key management and host key verification entirely."
+          # DO NOT DO THIS IN REAL LIFE:
+          echo "ssh $DEPLOY_USER@$DEPLOY_HOST 'echo deployed'" || true
+          sleep 10
+          echo "Deployment 'complete' (but not really)."
