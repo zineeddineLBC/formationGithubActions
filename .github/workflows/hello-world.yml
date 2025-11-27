@@ -1,0 +1,36 @@
+
+name: Hello World Matrix Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+    inputs:
+      run_second_job:
+        description: "Activate the second job that asks 'How are you?'"
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+
+jobs:
+  hello-world:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - name: Print Hello World
+        run: echo "Hello World from ${{ matrix.os }}"
+
+  ask-how-are-you:
+    if: ${{ github.event.inputs.run_second_job == 'true' }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - name: Ask how are you
+        run: echo "How are you from ${{ matrix.os }}?"
